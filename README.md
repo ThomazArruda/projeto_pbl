@@ -25,6 +25,9 @@ projeto_pbl/
 │   ├── data_capture/
 │   │   └── serial_plotter.py     # Leitor/plotter dos dados via serial
 │   └── dashboard/
+│       ├── __init__.py           # Marca o diretório como pacote Python
+│       ├── app.py                # Aplicação Streamlit com dashboards
+│       └── database.py           # Camada de persistência (SQLite)
 │       └── app.py                # Aplicação Streamlit com dashboards
 ├── data/
 │   └── README.md                 # Orientações sobre arquivos de sessão
@@ -74,12 +77,39 @@ python software/data_capture/serial_plotter.py --demo
 ## Painel Clínico Streamlit
 
 O painel simula o acompanhamento de sessões, guarda o histórico de cada paciente
+em um banco SQLite (`data/clinic.db`) e exibe métricas de desempenho. Para
+executar:
 na pasta `data/` e exibe métricas de desempenho. Para executar:
 
 ```bash
 streamlit run software/dashboard/app.py
 ```
 
+Ao abrir o painel você pode cadastrar novos pacientes através do formulário na
+barra lateral. As sessões coletadas (mesmo em modo simulado) são associadas ao
+paciente selecionado e salvas automaticamente no banco de dados. O arquivo é
+ignorado pelo Git para que informações clínicas reais não sejam versionadas.
+
+### Estrutura do Banco de Dados
+
+O arquivo `data/clinic.db` contém duas tabelas:
+
+- `patients(id, name)` – Lista dos pacientes cadastrados na clínica.
+- `sessions(id, patient_id, collected_at, payload_json)` – Histórico das sessões
+  de monitoramento, com os dados da sessão armazenados em JSON.
+
+Para inspecionar o banco fora do Streamlit, utilize qualquer ferramenta SQLite,
+por exemplo:
+
+```bash
+sqlite3 data/clinic.db ".tables"
+```
+
+Ou exporte os dados para CSV:
+
+```bash
+sqlite3 -header -csv data/clinic.db "SELECT * FROM sessions;" > data/sessions.csv
+```
 Por padrão os arquivos de sessão são salvos como `data/Paciente_A.json`,
 `data/Paciente_B.json`, etc. Esses arquivos são ignorados pelo Git para evitar que
 dados sensíveis sejam versionados.

@@ -28,6 +28,8 @@ htmlcov/
 
 # Dados gerados em tempo de execução
 data/*.json
+data/*.csv
+data/clinic.db
 
 # Configurações de IDE / Sistema
 .vscode/
