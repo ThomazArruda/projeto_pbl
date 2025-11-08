@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 import time
+from . import database
 from software.dashboard import database
 
 # Inicializa o banco de dados local e garante pacientes de demonstração
@@ -259,6 +260,13 @@ if selected_session == "Sessão Atual (Ao Vivo)":
         history_list = ""
         # Limitar a 5 sessões
         for s in sessions[:5]:
+            # Calcular média simples para o indicador
+            avg_le_q = np.mean(s["data"]["le_quad"]) if s["data"]["le_quad"] else 0
+            avg_ri_q = np.mean(s["data"]["ri_quad"]) if s["data"]["ri_quad"] else 0
+            indicator_le = get_status_indicator(avg_le_q)
+            indicator_ri = get_status_indicator(avg_ri_q)
+            history_list += f"`{s['date']}` {indicator_le} | {indicator_ri}\n"
+        st.markdown(history_list or "Nenhuma sessão anterior.")
             for s in reversed(db["sessions"][-5:]):
                 # Calcular média simples para o indicador
                 avg_le_q = np.mean(s["data"]["le_quad"]) if s["data"]["le_quad"] else 0
@@ -380,6 +388,8 @@ else:
             # Gráfico de evolução das médias
             evolution_data = []
             for s in sessions:
+                avg_val = np.mean(s["data"]["le_quad"]) # Evolução do Quadríceps Esquerdo
+                evolution_data.append({"date": s["date"], "progress": avg_val})
                 for s in db["sessions"]:
                     avg_val = np.mean(s["data"]["le_quad"]) # Evolução do Quadríceps Esquerdo
                     evolution_data.append({"date": s["date"], "progress": avg_val})
