@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 import time
+from . import database
 import database
 
 # Inicializa o banco de dados local e garante pacientes de demonstração
@@ -87,6 +88,15 @@ def get_status_indicator(value):
     else:
         return "🔴"
 
+def trigger_rerun():
+    """Solicita um novo ciclo do Streamlit, compatível com versões antigas."""
+
+    rerun = getattr(st, "rerun", None)
+    if rerun is None:
+        rerun = getattr(st, "experimental_rerun", None)
+    if rerun:
+        rerun()
+
 def ensure_patient_state():
     """Garante que um paciente válido esteja carregado no estado."""
 
@@ -141,6 +151,7 @@ if 'current_patient' not in st.session_state:
 # --- Barra Lateral (Sidebar) ---
 with st.sidebar:
     st.title("Controle da Sessão")
+
     
     # Seleção de Paciente
     patient_names = list(patient_lookup.keys())
@@ -149,12 +160,31 @@ with st.sidebar:
         "Selecionar Paciente",
         patient_names,
         index=current_index,
+        key="patient_selector",
     )
     st.session_state.current_patient_id = patient_lookup[selected_name]
     current_patient_id = st.session_state.current_patient_id
     current_patient_name = selected_name
 
     # Cadastro rápido de novos pacientes
+    st.subheader("Cadastrar novo paciente")
+    new_patient_name = st.text_input("Nome completo", key="new_patient_name")
+    if st.button("Adicionar Paciente", use_container_width=True, key="add_patient_button"):
+        new_id = database.add_patient(new_patient_name)
+        if new_id:
+            st.success(f"Paciente '{new_patient_name}' cadastrado!")
+            st.session_state.current_patient_id = new_id
+            st.session_state.new_patient_name = ""
+            current_patient_id = new_id
+            current_patient_name = database.get_patient(new_id)["name"]
+            patients = database.list_patients()
+            patient_lookup = {p["name"]: p["id"] for p in patients}
+            patient_names = list(patient_lookup.keys())
+            trigger_rerun()
+        else:
+            st.warning("Informe um nome válido ou utilize outro nome.")
+
+    st.caption("Os dados ficam salvos em data/clinic.db")
     with st.form("add_patient_form"):
         st.write("Cadastrar novo paciente")
         new_patient_name = st.text_input("Nome completo")
@@ -196,6 +226,45 @@ with st.sidebar:
 
     # Botões de Controle
     col1, col2 = st.columns(2)
+    if col1.button("▶️ Iniciar Nova Sessão", use_container_width=True, disabled=st.session_state.is_running, key="start_session"):
+        st.session_state.is_running = True
+        st.session_state.session_data = {
+            "time": [], "le_quad": [], "le_isq": [],
+            "ri_quad": [], "ri_isq": [], "hip_angle": []
+        }
+
+    sessions = database.get_sessions(current_patient_id)
+
+    if col2.button("⏹️ Parar e Salvar", use_container_width=True, disabled=not st.session_state.is_running, key="stop_session"):
+        st.session_state.is_running = False
+
+        # Salvar os dados
+        if st.session_state.session_data["time"]:  # Só salvar se houver dados
+            database.add_session(current_patient_id, st.session_state.session_data)
+            st.success("Sessão salva com sucesso!")
+            sessions = database.get_sessions(current_patient_id)
+            if sessions:
+                st.session_state.selected_session_label = sessions[0]["date"]
+            trigger_rerun()
+        else:
+            st.warning("Nenhum dado coletado para salvar.")
+
+    st.divider()
+
+    session_dates = ["Sessão Atual (Ao Vivo)"] + [s["date"] for s in sessions]
+
+    if "selected_session_label" not in st.session_state or st.session_state.selected_session_label not in session_dates:
+        st.session_state.selected_session_label = session_dates[0]
+
+    # Seleção de Sessão (Histórico ou Ao Vivo)
+    selected_session = st.selectbox(
+        "Selecionar Sessão",
+        session_dates,
+        key="selected_session_label",
+    )
+
+# --- Título Principal ---
+st.title(f"Plataforma de Reabilitação Pós-AVC - {current_patient_name}")
     if col1.button("▶️ Iniciar Nova Sessão", use_container_width=True, disabled=st.session_state.is_running):
         st.session_state.is_running = True
         st.session_state.session_data = {
@@ -256,6 +325,13 @@ if selected_session == "Sessão Atual (Ao Vivo)":
     
     with metrics_col_history:
         st.subheader("Histórico Recente")
+        history_lines = []
+        seen_sessions = set()
+        # Limitar a 5 sessões distintas
+        for s in sessions:
+            if s["id"] in seen_sessions:
+                continue
+            seen_sessions.add(s["id"])
         history_list = ""
         # Limitar a 5 sessões
         for s in sessions[:5]:
@@ -272,6 +348,10 @@ if selected_session == "Sessão Atual (Ao Vivo)":
             avg_ri_q = np.mean(s["data"]["ri_quad"]) if s["data"]["ri_quad"] else 0
             indicator_le = get_status_indicator(avg_le_q)
             indicator_ri = get_status_indicator(avg_ri_q)
+            history_lines.append(f"`{s['date']}` {indicator_le} | {indicator_ri}")
+            if len(history_lines) == 5:
+                break
+        st.markdown("\n".join(history_lines) or "Nenhuma sessão anterior.")
             history_list += f"`{s['date']}` {indicator_le} | {indicator_ri}\n"
         st.markdown(history_list or "Nenhuma sessão anterior.")
 
