@@ -1,202 +1,133 @@
-"""Ferramenta de linha de comando para visualizar sinais EMG/ECG enviados pela ESP32.
-
-O script lê dados do monitor serial (ou gera dados simulados) e os exibe em dois
-subgráficos usando Matplotlib. É útil para depurar a comunicação entre o firmware
-Arduino/ESP32 e o computador antes de integrar o fluxo em aplicações maiores.
-"""
-
-from __future__ import annotations
-
-import argparse
-import math
-import random
-import sys
+import serial
 import time
-from collections import deque
-from dataclasses import dataclass
-from typing import Deque, Dict, Optional
-
+import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
+from collections import deque
+import argparse
 
+# --- Argumentos de Linha de Comando ---
+parser = argparse.ArgumentParser(description='Plota dados seriais do ESP32 (EMG, ECG, 2x IMU)')
+parser.add_argument(
+    '--port', 
+    type=str, 
+    required=True, 
+    help='Porta serial (ex: COM3 no Windows, /dev/ttyUSB0 no Linux)'
+)
+parser.add_argument(
+    '--baud', 
+    type=int, 
+    default=115200, 
+    help='Baud rate (padrão: 115200)'
+)
+args = parser.parse_args()
+
+# --- Configurações ---
+BAUD = args.baud
+PORT = args.port
+FS = 100  # Taxa de amostragem esperada (Hz)
+N_CHANNELS = 14 # Número de canais que o Arduino está enviando
+WINDOW_SIZE = FS * 5 # Janela de 5 segundos
+
+# --- Buffers de Dados (um deque para cada canal) ---
+# Vamos armazenar todos os 14 canais, mesmo que só plotemos 4
+data_buffers = [deque([0.0] * WINDOW_SIZE, maxlen=WINDOW_SIZE) for _ in range(N_CHANNELS)]
+
+# --- Configuração do Gráfico (4 subplots) ---
+plt.ion()
+fig, ax = plt.subplots(4, 1, figsize=(10, 8), constrained_layout=True)
+fig.suptitle(f"Debug dos Sensores da Perna (Porta: {PORT})", fontsize=16)
+x_axis = np.arange(0, WINDOW_SIZE)
+
+# Nomes dos gráficos (vamos plotar 4 dos 14)
+plot_indices = [0, 1, 2, 8] # [EMG, ECG, IMU1_Ax, IMU2_Ax]
+plot_titles = [
+    'Canal 0: EMG (Quadríceps)',
+    'Canal 1: ECG (Isquiotibial)',
+    'Canal 2: IMU 1 - Acel. X (Quadril)',
+    'Canal 8: IMU 2 - Acel. X (Coxa)'
+]
+
+# Criar as linhas do gráfico
+lines = []
+for i in range(4):
+    idx = plot_indices[i]
+    ln, = ax[i].plot(x_axis, data_buffers[idx], lw=1)
+    ax[i].set_title(plot_titles[i])
+    ax[i].set_ylim(0, 4096) # Limite padrão para analógicos
+    lines.append(ln)
+
+# Ajustar os limites Y dos IMUs
+ax[2].set_ylim(-20, 20) # Acelerômetro (em m/s^2)
+ax[3].set_ylim(-20, 20) # Acelerômetro (em m/s^2)
+
+t_last_draw = time.time()
+
+# --- Conexão Serial ---
 try:
-    import serial  # type: ignore
-except ImportError as exc:  # pragma: no cover - feedback amigável
-    print(
-        "O pacote 'pyserial' é obrigatório para a captura dos dados. "
-        "Instale-o com 'pip install pyserial'.",
-        file=sys.stderr,
-    )
-    raise
+    ser = serial.Serial(PORT, BAUD, timeout=0.1)
+    print(f"Conectado a {PORT} em {BAUD} baud.")
+except serial.SerialException as e:
+    print(f"Erro ao abrir a porta serial {PORT}: {e}")
+    exit()
 
+time.sleep(1.0) # Espera o ESP32 resetar
+ser.flushInput()
 
-@dataclass
-class Sample:
-    """Amostra única contendo leituras normalizadas dos sensores."""
-
-    timestamp: float
-    ecg: float
-    emg: float
-
-
-class SampleSource:
-    """Interface que produz amostras do monitor serial ou dados simulados."""
-
-    def __init__(self, port: str, baud_rate: int, demo_mode: bool = False) -> None:
-        self.demo_mode = demo_mode
-        self._start_time = time.time()
-        self._serial = None
-
-        if not demo_mode:
-            try:
-                self._serial = serial.Serial(port, baud_rate, timeout=1)
-            except serial.SerialException as exc:
-                raise SystemExit(
-                    f"Não foi possível abrir a porta serial '{port}': {exc}"
-                ) from exc
-
-    def read(self) -> Optional[Sample]:
-        """Lê uma nova amostra ou retorna ``None`` quando não há dados disponíveis."""
-
-        now = time.time()
-        elapsed = now - self._start_time
-
-        if self.demo_mode:
-            # Gera sinais artificiais para demonstrar o fluxo.
-            ecg_value = 2048 + 800 * math.sin(2 * math.pi * 1.2 * elapsed)
-            emg_value = 1500 + 600 * math.sin(2 * math.pi * 0.8 * elapsed + math.pi / 4)
-            # Adiciona ruído para simular variabilidade.
-            ecg_value += random.uniform(-120, 120)
-            emg_value += random.uniform(-150, 150)
-            return Sample(elapsed, ecg_value, emg_value)
-
-        if self._serial is None:
-            return None
-
+# --- Loop Principal de Leitura e Plot ---
+try:
+    while True:
+        line = ser.readline()
+        if not line:
+            continue
+        
         try:
-            raw_line = self._serial.readline().decode("utf-8", errors="ignore").strip()
-        except serial.SerialException as exc:
-            raise SystemExit(f"Erro ao ler a porta serial: {exc}") from exc
-
-        if not raw_line:
-            return None
-
-        parsed = _parse_serial_line(raw_line)
-        if parsed is None:
-            return None
-
-        return Sample(elapsed, parsed["ecg"], parsed["emg"])
-
-    def close(self) -> None:
-        if self._serial is not None and self._serial.is_open:
-            self._serial.close()
-
-
-def _parse_serial_line(line: str) -> Optional[Dict[str, float]]:
-    """Interpreta as mensagens no formato ``ECG: <valor>, EMG: <valor>``."""
-
-    try:
-        parts = [segment.strip() for segment in line.split(",") if segment.strip()]
-        data: Dict[str, float] = {}
-        for part in parts:
-            if ":" not in part:
+            # Decodifica a linha (bytes -> string) e remove espaços em branco
+            line_str = line.decode('utf-8').strip()
+            
+            # Divide a string CSV em uma lista de valores
+            values_str = line_str.split(',')
+            
+            # Verifica se recebemos o número correto de canais
+            if len(values_str) != N_CHANNELS:
+                print(f"Linha mal formatada (esperava {N_CHANNELS}, recebeu {len(values_str)}): {line_str}")
                 continue
-            key, value = part.split(":", 1)
-            key = key.strip().lower()
-            data[key] = float(value.strip())
-    except ValueError:
-        return None
 
-    if "ecg" in data and "emg" in data:
-        return data
-    return None
+            # Converte todos os valores de string para float
+            values_float = [float(v) for v in values_str]
 
+            # Adiciona cada valor ao seu respectivo buffer
+            for i in range(N_CHANNELS):
+                data_buffers[i].append(values_float[i])
+        
+        except (UnicodeDecodeError, ValueError) as e:
+            print(f"Erro no parsing: {e} | Linha: {line_str}")
+            continue
+        
+        # --- Atualização do Gráfico (a ~30Hz para economizar CPU) ---
+        if time.time() - t_last_draw > (1/30):
+            t_last_draw = time.time()
+            
+            # Atualiza os dados das 4 linhas que estamos plotando
+            for i in range(4):
+                idx = plot_indices[i]
+                lines[i].set_ydata(data_buffers[idx])
+            
+            # Reajusta os limites Y dos analógicos (EMG/ECG)
+            min_emg = np.min(data_buffers[0])
+            max_emg = np.max(data_buffers[0])
+            ax[0].set_ylim(min_emg * 0.9, max_emg * 1.1)
+            
+            min_ecg = np.min(data_buffers[1])
+            max_ecg = np.max(data_buffers[1])
+            ax[1].set_ylim(min_ecg * 0.9, max_ecg * 1.1)
 
-def build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        description="Visualiza em tempo real sinais EMG/ECG enviados pela ESP32."
-    )
-    parser.add_argument(
-        "--port",
-        help="Porta serial onde a ESP32 está conectada (ex.: COM3 ou /dev/ttyUSB0).",
-    )
-    parser.add_argument(
-        "--baud", type=int, default=115200, help="Taxa de transmissão (baud rate)."
-    )
-    parser.add_argument(
-        "--window",
-        type=int,
-        default=500,
-        help="Número de amostras recentes exibidas por gráfico.",
-    )
-    parser.add_argument(
-        "--demo",
-        action="store_true",
-        help="Executa em modo demonstração sem necessidade de hardware conectado.",
-    )
-    return parser
+            # Redesenha o gráfico
+            plt.pause(0.001)
 
-
-def main() -> None:
-    parser = build_arg_parser()
-    args = parser.parse_args()
-
-    if not args.demo and not args.port:
-        parser.error("Informe a porta serial com --port ou use o modo demonstração --demo.")
-
-    source = SampleSource(args.port or "", args.baud, demo_mode=args.demo)
-    buffer_time: Deque[float] = deque(maxlen=args.window)
-    buffer_ecg: Deque[float] = deque(maxlen=args.window)
-    buffer_emg: Deque[float] = deque(maxlen=args.window)
-
-    fig, (ax_ecg, ax_emg) = plt.subplots(2, 1, figsize=(10, 6), sharex=True)
-    line_ecg, = ax_ecg.plot([], [], label="ECG", color="tab:blue")
-    line_emg, = ax_emg.plot([], [], label="EMG", color="tab:orange")
-
-    ax_ecg.set_ylabel("ECG (ADC)")
-    ax_ecg.legend(loc="upper right")
-    ax_ecg.grid(True, alpha=0.3)
-
-    ax_emg.set_xlabel("Tempo (s)")
-    ax_emg.set_ylabel("EMG (ADC)")
-    ax_emg.legend(loc="upper right")
-    ax_emg.grid(True, alpha=0.3)
-
-    def update(_frame: int):
-        sample = source.read()
-        if sample is None:
-            return line_ecg, line_emg
-
-        buffer_time.append(sample.timestamp)
-        buffer_ecg.append(sample.ecg)
-        buffer_emg.append(sample.emg)
-
-        line_ecg.set_data(buffer_time, buffer_ecg)
-        line_emg.set_data(buffer_time, buffer_emg)
-
-        if buffer_time:
-            times = list(buffer_time)
-            x_end = times[-1] if times[-1] > times[0] else times[0] + 1
-            ax_ecg.set_xlim(times[0], x_end)
-
-            all_values = list(buffer_ecg) + list(buffer_emg)
-            if all_values:
-                ymin = min(all_values)
-                ymax = max(all_values)
-                padding = max((ymax - ymin) * 0.1, 50)
-                ax_ecg.set_ylim(ymin - padding, ymax + padding)
-                ax_emg.set_ylim(ymin - padding, ymax + padding)
-
-        return line_ecg, line_emg
-
-    _ = FuncAnimation(fig, update, interval=50, blit=False)
-
-    try:
-        plt.tight_layout()
-        plt.show()
-    finally:
-        source.close()
-
-
-if __name__ == "__main__":
-    main()
+except KeyboardInterrupt:
+    print("\nFinalizado pelo usuário.")
+finally:
+    ser.close()
+    plt.ioff()
+    plt.show() # Mostra o gráfico final estático
+    print("Porta serial fechada.")
