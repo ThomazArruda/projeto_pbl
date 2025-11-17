@@ -4,6 +4,9 @@
  * - Lê seus 3 sensores (EMG, ECG, Ângulo Relativo).
  * - Recebe os 3 sensores do Escravo via ESP-NOW.
  * - Envia todos os 6 valores para o PC via Bluetooth Serial.
+ *
+ * Correção V2: Atualiza a assinatura da função 'OnDataRecv' para
+ * o padrão moderno da biblioteca ESP-NOW (esp_now_recv_info).
  */
 
 #include <esp_now.h>
@@ -14,7 +17,6 @@
 #include "BluetoothSerial.h" // Importa a biblioteca Bluetooth
 
 // --- Configuração do Bluetooth ---
-// Se der erro aqui, talvez você precise ativar o Bluetooth no menu 'Tools'
 #if !defined(CONFIG_BT_ENABLED) || !defined(CONFIG_BLUEDROID_ENABLED)
 #error Bluetooth não está ativado! Por favor, ative-o no menu 'Tools'.
 #endif
@@ -68,9 +70,13 @@ void setup_hardware() {
 }
 
 // --- Callback: O que fazer quando o Escravo mandar dados ---
-void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
+// <<< CORREÇÃO AQUI: A assinatura da função foi atualizada.
+// O primeiro argumento agora é 'const esp_now_recv_info * info'
+void OnDataRecv(const esp_now_recv_info * info, const uint8_t *incomingData, int len) {
   // Apenas copiamos os dados recebidos para a nossa variável global
   memcpy(&dadosPerna2, incomingData, sizeof(dadosPerna2));
+  
+  // (O MAC Address agora está em 'info->src_addr', se precisarmos dele)
   
   /*
   // Descomente para debug no Monitor Serial
