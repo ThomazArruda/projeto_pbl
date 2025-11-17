@@ -1,17 +1,16 @@
 /*
- * FIRMWARE V5 (ALTA PERFORMANCE)
+ * FIRMWARE V7 (ALTA PERFORMANCE)
  *
  * O que ele faz:
  * 1. Remove todos os `delay()` do loop principal.
  * 2. Lê EMG (D34) e ECG (D35).
  * 3. Lê os dois IMUs (MPU-6050) em seus barramentos I2C separados.
- * 4. Aplica um Filtro Complementar em cada IMU para fundir Acelerômetro e
- * Giroscópio, obtendo um ângulo estável (Pitch) para cada um.
+ * 4. Aplica um Filtro Complementar em cada IMU para obter um ângulo (Pitch).
  * 5. Calcula o Ângulo Relativo (Angulo1 - Angulo2).
- * 6. Envia apenas 3 valores pela serial em um formato rápido: "E:valor,C:valor,A:valor"
+ * 6. Envia apenas 3 valores: E:valor, C:valor, A:valor_float
  *
- * Correção V5: Remove a re-definição de 'RAD_TO_DEG', que já existe na biblioteca
- * do ESP32 (Arduino.h).
+ * Correção V7: Aplica 'fabs()' (módulo/valor absoluto) ao ângulo relativo,
+ * garantindo que o valor enviado seja sempre positivo.
  */
 
 #include <Wire.h>
@@ -26,7 +25,7 @@
 Adafruit_MPU6050 mpu1;
 
 // --- Barramento I2C nº 2 (Customizado, para IMU_P) ---
-TwoWire Wire1 = TwoWire(1);
+// A biblioteca Wire do ESP32 já define 'Wire1' automaticamente.
 Adafruit_MPU6050 mpu2;
 #define I2C_BUS1_SDA 32
 #define I2C_BUS1_SCL 33
@@ -37,8 +36,7 @@ float pitch2 = 0; // Ângulo (Pitch) do IMU 2
 unsigned long last_time; // Tempo da última leitura
 
 // --- Constantes do Filtro ---
-// <<< CORREÇÃO AQUI: Linha removida. RAD_TO_DEG já é definido por Arduino.h
-// const float RAD_TO_DEG = 180.0 / M_PI; 
+// A constante 'RAD_TO_DEG' já é definida por Arduino.h
 const float COMPL_FILTER_ALPHA = 0.98; // 98% Giroscópio, 2% Acelerômetro
 
 // --- Constantes de Loop (Sem Delay) ---
@@ -48,7 +46,7 @@ unsigned long last_serial_time = 0;
 void setup() {
   Serial.begin(115200);
   while (!Serial) delay(10);
-  Serial.println("--- Firmware V5 (Ângulo Relativo) ---");
+  Serial.println("--- Firmware V7 (Ângulo Absoluto) ---");
 
   pinMode(EMG_PIN, INPUT);
   pinMode(ECG_PIN, INPUT);
@@ -93,13 +91,10 @@ void loop() {
   mpu2.getEvent(&a2, &g2, &temp2);
 
   // 2. Calcular o ângulo do Acelerômetro (Pitch) para cada IMU
-  // (Esta é a parte "barulhenta" do filtro)
   float pitch1_acc = atan2(a1.acceleration.y, a1.acceleration.z) * RAD_TO_DEG;
   float pitch2_acc = atan2(a2.acceleration.y, a2.acceleration.z) * RAD_TO_DEG;
 
   // 3. Calcular o ângulo do Giroscópio (Pitch) para cada IMU
-  // (Esta é a parte "suave" do filtro, que "drifta")
-  // g1.gyro.x é a rotação no eixo X, que corresponde ao Pitch
   pitch1 = COMPL_FILTER_ALPHA * (pitch1 + g1.gyro.x * delta_time) + (1.0 - COMPL_FILTER_ALPHA) * pitch1_acc;
   pitch2 = COMPL_FILTER_ALPHA * (pitch2 + g2.gyro.x * delta_time) + (1.0 - COMPL_FILTER_ALPHA) * pitch2_acc;
   
@@ -114,7 +109,8 @@ void loop() {
     int valor_ecg = analogRead(ECG_PIN);
 
     // 2. Calcular Ângulo Relativo
-    float angulo_relativo = pitch1 - pitch2;
+    // <<< CORREÇÃO AQUI: Aplicado fabs() para pegar o módulo (valor absoluto)
+    float angulo_relativo = fabs(pitch1 - pitch2); 
 
     // 3. Enviar dados no formato otimizado
     // Formato: E:valor,C:valor,A:valor_float
