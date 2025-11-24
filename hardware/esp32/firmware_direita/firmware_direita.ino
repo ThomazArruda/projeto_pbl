@@ -1,6 +1,6 @@
 /*
- * FIRMWARE PERNA ESQUERDA (Wi-Fi UDP)
- * ID: ESQ
+ * FIRMWARE PERNA DIREITA (Wi-Fi UDP)
+ * ID: DIR
  * Envia: ID, ANGULO, EMG, ECG
  */
 #include <WiFi.h>
@@ -83,5 +83,5 @@ void loop() {
     udp.print(buffer_dados); 
     udp.endPacket();
     
-    delay(10); // ~100Hz
+    delay(5); // ~200Hz
 }

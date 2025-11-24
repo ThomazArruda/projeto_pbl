@@ -73,7 +73,7 @@ void loop() {
 
     int emg_val = analogRead(EMG_PIN);
     int ecg_val = analogRead(ECG_PIN);
-    float final_angle = fabs(pitchQuadril - pitchCoxa); 
+    float final_angle = fabs(pitchQuadril - pitchCoxa)-180; 
 
     char buffer_dados[64];
     // Formato CSV simples: ESQ,ANGULO,EMG,ECG
@@ -83,5 +83,5 @@ void loop() {
     udp.print(buffer_dados); 
     udp.endPacket();
     
-    delay(10); // ~100Hz
+    delay(5); // ~100Hz
 }
