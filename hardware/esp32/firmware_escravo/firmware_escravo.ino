@@ -1,130 +1,119 @@
-/*
- * FIRMWARE ESCRAVO (PERNA 2)
- *
- * Versão de 6 valores (3 por perna):
- * - Lê 4 sensores (EMG, ECG, 2x IMU).
- * - Calcula o ÂNGULO RELATIVO (fabs(pitch1 - pitch2)).
- * - Envia 3 valores (EMG, ECG, Ângulo) para o Mestre.
- */
-
-#include <esp_now.h>
 #include <WiFi.h>
+#include <WiFiUdp.h>
 #include <Wire.h>
 #include <Adafruit_MPU6050.h>
 #include <Adafruit_Sensor.h>
 
-// ======================================================================
-// !!!   MAC ADDRESS DO MESTRE   !!!
-// O seu MAC (EC:64:C9:86:4D:08) está aqui:
-// ======================================================================
-uint8_t mac_mestre[] = {0xEC, 0x64, 0xC9, 0x86, 0x4D, 0x08};
-// ======================================================================
+// --- [CONFIGURAÇÕES DE REDE] ---
+const char* ssid = "Lara Beatriz";    // Wi-Fi do grupo
+const char* password = "12345678"; // Senha do Wi-Fi 
+const char* host_ip = " 192.168.249.15";  // IP do computador
+const int udp_port = 4210; 
 
+// --- [CONFIGURAÇÕES GERAIS] ---
+const char* ID_DISPOSITIVO = "DIR"; // ID ÚNICO para o computador
+WiFiUDP udp;
 
-// --- Estrutura dos Dados (AGORA COM 3 VALORES) ---
-typedef struct struct_message {
-    int emg_val;
-    int ecg_val;
-    float angle_val; // <--- APENAS O ÂNGULO RELATIVO
-} struct_message;
+// --- [HARDWARE] ---
+#define EMG_PIN 34 
+#define ECG_PIN 35 
 
-struct_message dadosPerna2; // Variável para guardar nossos dados
+// MPU (Sensores de Angulo) - Usando pinos padrões do projeto anterior
+Adafruit_MPU6050 mpuQuadril; 
+Adafruit_MPU6050 mpuCoxa;    
+#define I2C_BUS2_SDA 32 // Para o MPU Coxa
+#define I2C_BUS2_SCL 33
 
-// --- Pinos e Sensores (Sem alteração) ---
-#define EMG_PIN 34
-#define ECG_PIN 35
-Adafruit_MPU6050 mpu1;
-Adafruit_MPU6050 mpu2;
-#define I2C_BUS1_SDA 32
-#define I2C_BUS1_SCL 33
-float pitch1 = 0, pitch2 = 0;
+float pitchQuadril = 0, pitchCoxa = 0;
 unsigned long last_time;
 const float COMPL_FILTER_ALPHA = 0.98;
-const unsigned long SENSOR_PERIOD = 10; // Lê sensores a 100Hz
-unsigned long last_sensor_time = 0;
-
-// --- Setup do Hardware (Sem alteração) ---
-void setup_hardware() {
-  Serial.begin(115200);
-  pinMode(EMG_PIN, INPUT);
-  pinMode(ECG_PIN, INPUT);
-  
-  Wire.begin(); 
-  if (!mpu1.begin(0x68, &Wire)) { 
-    Serial.println("ESCRAVO: Falha MPU-1 (barramento 0)");
-    while(1) delay(10);
-  }
-  Wire1.begin(I2C_BUS1_SDA, I2C_BUS1_SCL);
-  if (!mpu2.begin(0x68, &Wire1)) {
-    Serial.println("ESCRAVO: Falha MPU-2 (barramento 1)");
-    while(1) delay(10);
-  }
-  mpu1.setAccelerometerRange(MPU6050_RANGE_8_G); mpu1.setGyroRange(MPU6050_RANGE_500_DEG);
-  mpu2.setAccelerometerRange(MPU6050_RANGE_8_G); mpu2.setGyroRange(MPU6050_RANGE_500_DEG);
-  Serial.println("ESCRAVO: Hardware pronto.");
-}
-
-// --- Setup do ESP-NOW (Sem alteração) ---
-void setup_espnow() {
-  WiFi.mode(WIFI_STA);
-  if (esp_now_init() != ESP_OK) {
-    Serial.println("ESCRAVO: Erro ao inicializar ESP-NOW");
-    return;
-  }
-  
-  esp_now_peer_info_t peerInfo;
-  memcpy(peerInfo.peer_addr, mac_mestre, 6);
-  peerInfo.channel = 0;  
-  peerInfo.encrypt = false;
-  
-  if (esp_now_add_peer(&peerInfo) != ESP_OK){
-    Serial.println("ESCRAVO: Falha ao adicionar Mestre");
-    return;
-  }
-  Serial.println("ESCRAVO: ESP-NOW pronto. Pareado com Mestre.");
-}
+const unsigned long SENSOR_PERIOD = 10; // 10ms (100 Hz)
 
 void setup() {
-  setup_hardware();
-  setup_espnow();
-  last_time = millis();
-  last_sensor_time = millis();
+    Serial.begin(115200);
+    delay(2000); 
+
+    // --- Inicialização I2C ---
+    Wire.begin(); // Padrão 21/22 (Quadril)
+    Wire1.begin(I2C_BUS2_SDA, I2C_BUS2_SCL); // 32/33 (Coxa)
+
+    // Inicializa MPU 1 (Quadril)
+    if (!mpuQuadril.begin(0x68, &Wire)) {
+        Serial.println("ESCRAVA: Falha MPU Quadril. Verifique a conexao!");
+    } else {
+        Serial.println("ESCRAVA: MPU Quadril OK.");
+    }
+    
+    // Inicializa MPU 2 (Coxa)
+    if (!mpuCoxa.begin(0x68, &Wire1)) {
+        Serial.println("ESCRAVA: Falha MPU Coxa.");
+    } else {
+        Serial.println("ESCRAVA: MPU Coxa OK.");
+    }
+
+    // --- Conexão Wi-Fi ---
+    Serial.print("Conectando a ");
+    Serial.println(ssid);
+    
+    WiFi.begin(ssid, password);
+    
+    int tentativas = 0;
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(500);
+        Serial.print(".");
+        tentativas++;
+        if (tentativas > 20) {
+            Serial.println("\nFalha ao conectar ao Wi-Fi. Reiniciando...");
+            ESP.restart();
+        }
+    }
+
+    Serial.println("\nWi-Fi conectado!");
+    Serial.print("IP da Escrava: ");
+    Serial.println(WiFi.localIP());
+    udp.begin(udp_port); // Inicia UDP para envio
+
+    last_time = millis();
 }
 
-// --- Loop de Leitura e Envio ---
 void loop() {
-  unsigned long current_time = millis();
+    unsigned long current_time = millis();
+    float delta_time = (current_time - last_time) / 1000.0;
 
-  // --- Loop de Cálculo (Sem alteração) ---
-  float delta_time = (current_time - last_time) / 1000.0;
-  sensors_event_t a1, g1, temp1; mpu1.getEvent(&a1, &g1, &temp1);
-  sensors_event_t a2, g2, temp2; mpu2.getEvent(&a2, &g2, &temp2);
-  float pitch1_acc = atan2(a1.acceleration.y, a1.acceleration.z) * RAD_TO_DEG;
-  float pitch2_acc = atan2(a2.acceleration.y, a2.acceleration.z) * RAD_TO_DEG;
-  pitch1 = COMPL_FILTER_ALPHA * (pitch1 + g1.gyro.x * delta_time) + (1.0 - COMPL_FILTER_ALPHA) * pitch1_acc;
-  pitch2 = COMPL_FILTER_ALPHA * (pitch2 + g2.gyro.x * delta_time) + (1.0 - COMPL_FILTER_ALPHA) * pitch2_acc;
-  last_time = current_time;
+    // --- LEITURA DO ANGULO ---
+    sensors_event_t a1, g1, temp1; mpuQuadril.getEvent(&a1, &g1, &temp1);
+    sensors_event_t a2, g2, temp2; mpuCoxa.getEvent(&a2, &g2, &temp2);
 
-  // --- Loop de Envio (Roda a 100Hz) ---
-  if (current_time - last_sensor_time >= SENSOR_PERIOD) {
-    last_sensor_time = current_time;
+    float pitchQuadril_acc = atan2(a1.acceleration.y, a1.acceleration.z) * 57.2958;
+    float pitchCoxa_acc = atan2(a2.acceleration.y, a2.acceleration.z) * 57.2958;
 
-    // <<< CORREÇÃO AQUI: Preenche os 3 valores >>>
-    dadosPerna2.emg_val = analogRead(EMG_PIN);
-    dadosPerna2.ecg_val = analogRead(ECG_PIN);
-    dadosPerna2.angle_val = fabs(pitch1 - pitch2); // Calcula o ângulo relativo
+    pitchQuadril = COMPL_FILTER_ALPHA * (pitchQuadril + g1.gyro.x * delta_time) + (1.0 - COMPL_FILTER_ALPHA) * pitchQuadril_acc;
+    pitchCoxa = COMPL_FILTER_ALPHA * (pitchCoxa + g2.gyro.x * delta_time) + (1.0 - COMPL_FILTER_ALPHA) * pitchCoxa_acc;
+    last_time = current_time;
+
+    // --- LEITURA ANALÓGICA ---
+    int emg_val = analogRead(EMG_PIN);
+    int ecg_val = analogRead(ECG_PIN);
+    float final_angle = fabs(pitchQuadril - pitchCoxa); 
+
+    // --- ENVIAR DADOS VIA UDP ---
+    // Formato: "ID,ANGULO,EMG,ECG"
+    char buffer_dados[100];
+    sprintf(buffer_dados, "%s,%.2f,%d,%d",
+        ID_DISPOSITIVO,
+        final_angle,
+        emg_val,
+        ecg_val
+    );
+
+    // Envio
+    udp.beginPacket(host_ip, udp_port);
+    udp.print(buffer_dados); 
+    udp.endPacket();
     
-    // Envia o pacote de dados (agora com 3 valores) para o Mestre
-    esp_err_t result = esp_now_send(mac_mestre, (uint8_t *) &dadosPerna2, sizeof(dadosPerna2));
+    // Print para debug (Serial USB)
+    Serial.println(buffer_dados);
 
-    /*
-    // Descomente para debug no Monitor Serial do ESCRAVO
-    if (result == ESP_OK) {
-      Serial.printf("ESCRAVO: Enviado E:%d, C:%d, A:%.2f\n", 
-        dadosPerna2.emg_val, dadosPerna2.ecg_val, dadosPerna2.angle_val);
-    } else {
-      Serial.println("ESCRAVO: Erro ao enviar pacote");
-    }
-    */
-  }
+    // Alta Frequência
+    delay(1); 
 }
