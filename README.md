@@ -1,6 +1,6 @@
 # Projeto PBL – Plataforma de Reabilitação Pós-AVC
 
-Repositório base para o protótipo que integra captura de sinais EMG/ECG com uma
+Repositório base para o protótipo que integra captura de sinais EMG/ECG e IMUs com uma
 interface clínica em Streamlit. O objetivo é apoiar equipes médicas na avaliação
 contínua de pacientes pós-AVC, desde a coleta no hardware até o painel de
 acompanhamento.
@@ -12,14 +12,14 @@ projeto_pbl/
 ├── hardware/
 │   └── esp32/
 │       ├── esp32_leg_sensors.ino      # Leitura básica de EMG/ECG/IMU
-│       ├── firmware_mestre/
-│       │   └── firmware_mestre.ino    # Coordena a comunicação mestre
-│       └── firmware_escravo/
-│           └── firmware_escravo.ino   # Nó escravo com sensores adicionais
+│       ├── firmware_direita/
+│       │   └── firmware_direita.ino    # Código perna direita
+│       └── firmware_esquerdo/
+│           └── firmware_esquerdo.ino   # Código perna esquerda
 ├── software/
 │   ├── __init__.py
 │   ├── data_capture/
-│   │   └── serial_plotter.py          # Debug de sinais via porta serial
+│   │   └── udp_plotter.py          # Debug de sinais via wifi
 │   └── dashboard/
 │       ├── __init__.py
 │       ├── app.py                     # Aplicação Streamlit
@@ -30,9 +30,8 @@ projeto_pbl/
 └── README.md
 ```
 
-- **hardware/** contém todos os firmwares para ESP32. O sketch `esp32_leg_sensors`
-  concentra a leitura local dos sensores, enquanto `firmware_mestre` e
-  `firmware_escravo` dividem a aquisição em dois módulos para testes distribuídos.
+- **hardware/** contém todos os firmwares para ESP32. Conectamos ambas as esps no mesmo hot spot
+  que o computador.
 - **software/** traz os componentes em Python. Use o `serial_plotter.py` para
   inspecionar o hardware antes do painel, e o diretório `dashboard` para a
   aplicação Streamlit com banco SQLite.
