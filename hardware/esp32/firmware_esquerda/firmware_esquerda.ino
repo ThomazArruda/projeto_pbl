@@ -10,10 +10,10 @@
 #include <Adafruit_Sensor.h>
 
 // --- [CONFIGURAÇÕES DE REDE] ---
-const char* ssid = "Lara Beatriz";     
-const char* password = "12345678"; 
+const char* ssid = "iPhone de Thomaz";     
+const char* password = "thomazqw"; 
 // !!! COLOQUE O IP DO SEU COMPUTADOR AQUI !!!
-const char* host_ip = "192.168.249.15";  
+const char* host_ip = "192.168.15.5";  
 const int udp_port = 4210; 
 
 const char* ID_DISPOSITIVO = "ESQ"; 
