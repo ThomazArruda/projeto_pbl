@@ -119,4 +119,4 @@ Você precisará de dois terminais abertos: um para o Backend (Servidor) e outro
 
 ---
 
-**Desenvolvido para o Projeto PBL - Engenharia de Computação**
+**Desenvolvido para o Projeto PBL - Engenharia Biomédica**
