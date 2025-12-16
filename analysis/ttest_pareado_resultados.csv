@@ -1,0 +1,8 @@
+TESTE T PAREADO - RESULTADOS,,,,,,,,,,,,,
+Data da análise,2025-12-03 15:46:07,,,,,,,,,,,,
+Sessões analisadas,19-23,,,,,,,,,,,,
+,,,,,,,,,,,,,
+Variável,N,Média ESQ,Média DIR,Diferença Média,Desvio Padrão,Teste-t,P-value,Cohen's d,Significância,IC 95% Inferior,IC 95% Superior,Tamanho do Efeito,Interpretação
+Ângulo (Angle),5,24.554,30.266,-5.712,11.879938,-1.075125,0.342846,-0.480811,NÃO,-20.462891,9.038891,Pequeno,Sem diferença significante (p = 0.3428)
+Eletromiografia (EMG),5,1674.4,2726.6,-1052.2,535.800523,-4.391169,0.011772,-1.963791,SIM,-1717.484219,-386.915781,Grande,Diferença significante entre pernas (p = 0.0118)
+Eletrocardiografia (ECG),5,2867.0,3213.8,-346.8,741.170156,-1.046276,0.35449,-0.467909,NÃO,-1267.084299,573.484299,Pequeno,Sem diferença significante (p = 0.3545)

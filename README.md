@@ -1,6 +1,6 @@
-# NeuroPasso 🧠🦵
+# HipTech 🧠🦵
 
-**NeuroPasso** é uma aplicação web completa para monitoramento e reabilitação de pacientes com deficiências motoras. O sistema visualiza dados em tempo real de sensores (Ângulo, EMG, ECG) conectados a microcontroladores ESP32, permitindo que fisioterapeutas acompanhem a evolução do tratamento e utilizem biofeedback visual.
+**HipTech** é uma aplicação web completa para monitoramento e reabilitação de pacientes com deficiências motoras. O sistema visualiza dados em tempo real de sensores (Ângulo, EMG, ECG) conectados a microcontroladores ESP32, permitindo que fisioterapeutas acompanhem a evolução do tratamento e utilizem biofeedback visual.
 
 ---
 
@@ -87,7 +87,7 @@ Você precisará de dois terminais abertos: um para o Backend (Servidor) e outro
 
 ---
 
-## 📖 Como Usar o NeuroPasso
+## 📖 Como Usar o HipTech
 
 1.  **Tela Inicial (Home):**
     *   Você verá a lista de pacientes cadastrados.
@@ -113,7 +113,7 @@ Você precisará de dois terminais abertos: um para o Backend (Servidor) e outro
 
 ### Passo 3: Análise de Dados (Relatório Científico) 📊
 
-Para gerar gráficos de alta resolução para relatórios, utilizamos um ambiente isolado com Jupyter Notebook.
+Para gerar gráficos de alta resolução para relatórios, utilizamos um ambiente isolado com Jupyter Notebook e scripts Python.
 
 1.  Abra um terminal e navegue até a pasta `analysis`:
     ```bash
@@ -128,6 +128,39 @@ Para gerar gráficos de alta resolução para relatórios, utilizamos um ambient
     ```bash
     pip install -r requirements.txt
     ```
+
+**Scripts de Análise Estatística:**
+
+Os seguintes scripts Python executam análises estatísticas completas e geram relatórios:
+
+- **`statistical_analysis.py`** - Análise angular com Shapiro-Wilk
+  ```bash
+  python statistical_analysis.py
+  ```
+  Gera: `analise_angular_*.xlsx`, `analise_angular_*.csv`, `boxplot_deltas_angulares_*.png`
+
+- **`emg_analysis.py`** - Análise de eletromiografia (EMG)
+  ```bash
+  python emg_analysis.py
+  ```
+  Gera: `analise_emg_*.xlsx`, `analise_emg_*.csv`, `boxplot_deltas_emg_*.png`
+
+- **`ecg_analysis.py`** - Análise de eletrocardiografia (ECG)
+  ```bash
+  python ecg_analysis.py
+  ```
+  Gera: `analise_ecg_*.xlsx`, `analise_ecg_*.csv`, `boxplot_deltas_ecg_*.png`
+
+- **`ttest_pareado.py`** - Teste T pareado bilateral
+  ```bash
+  python ttest_pareado.py
+  ```
+  Gera: `ttest_pareado_*.xlsx`, `ttest_pareado_*.csv`, `README_TEST_T.txt`
+
+**Relatório Interativo - Jupyter Notebook:**
+
+Para análise interativa com visualizações de alta resolução:
+
 4.  Abra o VS Code nesta pasta ou inicie o Jupyter:
     *   Recomendado: Abra o arquivo `scientific_report.ipynb` no VS Code.
     *   Certifique-se de selecionar o Kernel `analysis/venv`.
@@ -135,8 +168,42 @@ Para gerar gráficos de alta resolução para relatórios, utilizamos um ambient
 **Funcionalidades do Notebook:**
 *   **Alta Resolução:** Plota 100% dos pontos coletados (sem arredondamentos de tempo).
 *   **Comparação Bilateral:** Suporta dados das duas pernas simultaneamente (Direita=Sólida, Esquerda=Tracejada).
-*   **Fusão de Sensores (Sensor Fusion):** Calcula a "Ativação Muscular Total" fazendo a média `(EMG + ECG) / 2`.
+*   **Dados Brutos:** Visualização de ângulo, EMG e ECG em tempo real.
 *   **Filtro Butterworth:** Aplica filtros digitais para limpar o ruído do EMG e mostrar a envoltória de ativação muscular.
+*   **Filtro de Kalman:** Suavização avançada de trajetória de ângulo para cinemática profissional.
+
+**Documentação Científica:**
+
+A pasta `analysis/` inclui READMEs abrangentes em português:
+
+- **`README.txt`** - Metodologia Shapiro-Wilk com explicação didática
+- **`README_EMG.txt`** - Análise completa de eletromiografia
+- **`README_ECG.txt`** - Análise completa de sinais cardiovasculares
+- **`README_TEST_T.txt`** - Metodologia de t-test pareado com resultados clínicos
+- **`README_TEST_T_PT-BR.txt`** - Versão em português brasileiro
+- **`README_FINAL.txt`** - Resumo executivo de todas as análises
+- **`INDICE_ANALISES.txt`** - Índice navegável de todas as análises
+
+**Análise Estatística Realizada:**
+
+- ✓ Teste de Normalidade (Shapiro-Wilk): Valida se dados seguem distribuição normal
+- ✓ T-Test Pareado: Compara medidas bilaterais (perna parética vs controle)
+- ✓ Tamanho de Efeito (Cohen's d): Calcula magnitude prática da diferença
+- ✓ Intervalo de Confiança 95%: Estimativa do intervalo de confiança
+- ✓ Estatísticas Descritivas: Média, mediana, desvio padrão, quartis, CV
+
+---
+
+## 📚 Documentação Técnica
+
+**Arquivo: `METODOLOGIA_SOFTWARE.txt`** - Guia completo de arquitetura, tecnologias e metodologia
+
+Este arquivo, localizado na raiz do projeto, documenta:
+- Visão geral da arquitetura completa
+- Stack tecnológico detalhado (Backend FastAPI, Frontend React, Hardware ESP32)
+- Fluxo de dados de ponta a ponta
+- Metodologia estatística implementada (Shapiro-Wilk, t-test pareado, Cohen's d)
+- Roteiro completo de execução com troubleshooting
 
 ---
 

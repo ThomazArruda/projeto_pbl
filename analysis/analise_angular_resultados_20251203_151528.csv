@@ -1,0 +1,61 @@
+ANÁLISE ESTATÍSTICA DE VARIAÇÃO ANGULAR - SESSÕES 19-23
+================================================================================
+
+DADOS POR SESSÃO
+--------------------------------------------------------------------------------
+Sessão,Delta_Esquerda (°),Delta_Direita (°),Diferença_DIR-ESQ (°)
+19,42.69,32.7,-9.99
+20,11.32,12.67,1.35
+21,33.28,49.55,16.27
+22,7.66,9.69,2.03
+23,27.82,46.72,18.9
+
+
+ESTATÍSTICAS DESCRITIVAS - PERNA ESQUERDA (Parética)
+--------------------------------------------------------------------------------
+Métrica,Perna_Esquerda
+Perna,ESQ
+Contagem,5
+Média,24.553999999999995
+Mediana,27.82
+Desvio Padrão,14.800931727428512
+Variância,219.06757999999996
+Mínimo,7.66
+Q1 (25%),11.32
+Q3 (75%),33.28
+Máximo,42.69
+Amplitude,35.03
+Coef. Variação (%),60.279106163674
+
+
+ESTATÍSTICAS DESCRITIVAS - PERNA DIREITA (Controle)
+--------------------------------------------------------------------------------
+Métrica,Perna_Direita
+Perna,DIR
+Contagem,5
+Média,30.266000000000002
+Mediana,32.699999999999996
+Desvio Padrão,18.58441632120848
+Variância,345.3805300000001
+Mínimo,9.689999999999998
+Q1 (25%),12.670000000000002
+Q3 (75%),46.72
+Máximo,49.55000000000001
+Amplitude,39.860000000000014
+Coef. Variação (%),61.40360907027185
+
+
+TESTE DE NORMALIDADE - SHAPIRO-WILK
+--------------------------------------------------------------------------------
+Perna,Estatística,P-value,Resultado
+Esquerda,0.932319,0.612271,NORMAL (p > 0.05)
+Direita,0.872112,0.27508,NORMAL (p > 0.05)
+
+
+INTERPRETAÇÃO
+--------------------------------------------------------------------------------
+- Perna Esquerda (Parética): Perna afetada pelo AVC
+- Perna Direita (Controle): Perna saudável de referência
+- Delta (ΔAngle): Variação = Ângulo Máximo - Ângulo Mínimo
+- Shapiro-Wilk p-value > 0.05: Distribuição NORMAL
+- Shapiro-Wilk p-value ≤ 0.05: Distribuição NÃO NORMAL

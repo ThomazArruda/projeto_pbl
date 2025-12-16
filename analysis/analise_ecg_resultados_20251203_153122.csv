@@ -1,0 +1,61 @@
+ANÁLISE ESTATÍSTICA DE VARIAÇÃO ECG - SESSÕES 19-23
+================================================================================
+
+DADOS POR SESSÃO
+--------------------------------------------------------------------------------
+Sessão,Delta_Esquerda (mV),Delta_Direita (mV),Diferença_DIR-ESQ (mV)
+19,4095,4095,0
+20,1650,2368,718
+21,2791,3865,1074
+22,1704,2426,722
+23,4095,3315,-780
+
+
+ESTATÍSTICAS DESCRITIVAS - PERNA ESQUERDA (Parética)
+--------------------------------------------------------------------------------
+Métrica,Perna_Esquerda
+Perna,ESQ
+Contagem,5
+Média,2867.0
+Mediana,2791.0
+Desvio Padrão,1209.8968964337416
+Variância,1463850.5
+Mínimo,1650
+Q1 (25%),1704.0
+Q3 (75%),4095.0
+Máximo,4095
+Amplitude,2445
+Coef. Variação (%),42.20079861994216
+
+
+ESTATÍSTICAS DESCRITIVAS - PERNA DIREITA (Controle)
+--------------------------------------------------------------------------------
+Métrica,Perna_Direita
+Perna,DIR
+Contagem,5
+Média,3213.8
+Mediana,3315.0
+Desvio Padrão,797.9384061442337
+Variância,636705.7000000001
+Mínimo,2368
+Q1 (25%),2426.0
+Q3 (75%),3865.0
+Máximo,4095
+Amplitude,1727
+Coef. Variação (%),24.8285022759423
+
+
+TESTE DE NORMALIDADE - SHAPIRO-WILK
+--------------------------------------------------------------------------------
+Perna,Estatística,P-value,Resultado
+Esquerda,0.828192,0.134834,NORMAL (p > 0.05)
+Direita,0.877749,0.299234,NORMAL (p > 0.05)
+
+
+INTERPRETAÇÃO
+--------------------------------------------------------------------------------
+- Perna Esquerda (Parética): Perna afetada pelo AVC
+- Perna Direita (Controle): Perna saudável de referência
+- Delta (ΔECG): Variação = ECG Máximo - ECG Mínimo
+- Shapiro-Wilk p-value > 0.05: Distribuição NORMAL
+- Shapiro-Wilk p-value ≤ 0.05: Distribuição NÃO NORMAL
